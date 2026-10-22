@@ -1,11 +1,12 @@
 import { lazy, Suspense } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { AdminLayout, Page, Shell } from './components/Layout';
+import { LibraryLayout } from './components/LibraryLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Landing from './pages/Landing';
 
-// Route-level code splitting: each page loads only when opened
-const Catalog = lazy(() => import('./pages/Catalog'));
+const Library = lazy(() => import('./pages/Library'));
+const Shelf = lazy(() => import('./pages/Shelf'));
 const BookDetail = lazy(() => import('./pages/BookDetail'));
 const MyBorrowings = lazy(() => import('./pages/MyBorrowings'));
 const Account = lazy(() => import('./pages/Account'));
@@ -26,7 +27,10 @@ export default function App() {
         <Route element={<Shell />}>
           <Route element={<Page />}>
             <Route index element={<Landing />} />
-            <Route path="catalog" element={<Catalog />} />
+            <Route path="catalog" element={<LibraryLayout />}>
+              <Route index element={<Library />} />
+              <Route path="shelf/:letter" element={<Shelf />} />
+            </Route>
             <Route path="books/:id" element={<BookDetail />} />
             <Route path="login" element={<Login />} />
             <Route path="register" element={<Register />} />

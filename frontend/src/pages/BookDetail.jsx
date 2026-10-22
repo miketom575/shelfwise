@@ -7,6 +7,7 @@ import { useToast } from '../context/ToastContext';
 import { BookCover } from '../components/BookCover';
 import { ErrorState } from '../components/Ui';
 import { fmtDate } from '../utils/format';
+import { NextAvailable } from '../components/NextAvailable';
 
 function Copies({ book }) {
   const shown = Math.min(book.totalCopies, 14);
@@ -57,7 +58,7 @@ export default function BookDetail() {
         <Link to="/catalog">Catalog</Link> / <Link to={`/catalog?category=${encodeURIComponent(book.category)}`}>{book.category}</Link>
       </nav>
       <div className="detail">
-        <BookCover book={book} />
+        <div className={none ? 'is-out' : ''}><BookCover book={book} /></div>
         <div>
           <h1>{book.title}</h1>
           <p className="by">by {book.author}</p>
@@ -74,6 +75,7 @@ export default function BookDetail() {
               <strong>{none ? 'No copies on the shelf' : `${book.availableCopies} of ${book.totalCopies} ${book.totalCopies === 1 ? 'copy' : 'copies'} on the shelf`}</strong>
             </div>
             <Copies book={book} />
+            {none && <NextAvailable date={book.nextAvailableDate} />}
 
             <div style={{ marginTop: 18 }}>
               {eligibility.code === 'AUTH' ? (
