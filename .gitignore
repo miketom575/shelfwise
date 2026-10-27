@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+
+# Secrets and local settings: never commit these
+.env
+.env.*
+!.env.example
+.vercel
