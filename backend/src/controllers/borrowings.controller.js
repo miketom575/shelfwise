@@ -27,6 +27,7 @@ async function buildFilter(req, { ignoreStatus = false } = {}) {
     if (status === 'borrowed') filter.status = 'borrowed';
     if (status === 'returned') filter.status = 'returned';
     if (status === 'overdue') Object.assign(filter, { status: 'borrowed', dueDate: { $lt: startOfToday() } });
+    if (status === 'pending') Object.assign(filter, { status: 'borrowed', returnRequestStatus: 'pending' });
   }
 
   const q = str(req.query.q).slice(0, 100);
@@ -46,17 +47,18 @@ exports.list = asyncHandler(async (req, res) => {
   const filter = await buildFilter(req);
   const scope = await buildFilter(req, { ignoreStatus: true });
 
-  const [data, total, all, active, overdue] = await Promise.all([
+  const [data, total, all, active, overdue, pending] = await Promise.all([
     Borrowing.find(filter).sort({ borrowDate: -1 }).skip(pg.skip).limit(pg.limit).populate(POPULATE),
     Borrowing.countDocuments(filter),
     Borrowing.countDocuments(scope),
     Borrowing.countDocuments({ ...scope, status: 'borrowed' }),
     Borrowing.countDocuments({ ...scope, status: 'borrowed', dueDate: { $lt: startOfToday() } }),
+    Borrowing.countDocuments({ ...scope, status: 'borrowed', returnRequestStatus: 'pending' }),
   ]);
   res.json({
     data,
     ...pageMeta(pg, total),
-    counts: { all, borrowed: active, overdue, returned: all - active },
+    counts: { all, borrowed: active, overdue, pending, returned: all - active },
   });
 });
 
@@ -94,6 +96,35 @@ exports.returnOne = asyncHandler(async (req, res) => {
   const { loan, book } = await returnLoan(req.params.id, req.user);
   await loan.populate(POPULATE);
   res.json({ loan, book });
+});
+
+/** A reader asks to return one of their own books. The loan stays active until a librarian approves it. */
+exports.requestReturn = asyncHandler(async (req, res) => {
+  const loan = await Borrowing.findOneAndUpdate(
+    { _id: req.params.id, userId: req.user._id, status: 'borrowed', returnRequestStatus: { $ne: 'pending' } },
+    { $set: { returnRequestStatus: 'pending', returnRequestedAt: new Date() } },
+    { new: true }
+  );
+  if (!loan) {
+    const own = await Borrowing.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!own) throw new AppError('Loan not found.', 404);
+    if (own.status === 'returned') throw new AppError('This book has already been returned.', 409);
+    throw new AppError('A return request is already waiting for a librarian.', 409);
+  }
+  await loan.populate(POPULATE);
+  res.json({ loan });
+});
+
+/** A librarian declines a pending return request (approving uses PUT /:id, which records the return). */
+exports.declineReturn = asyncHandler(async (req, res) => {
+  const loan = await Borrowing.findOneAndUpdate(
+    { _id: req.params.id, status: 'borrowed', returnRequestStatus: 'pending' },
+    { $set: { returnRequestStatus: 'declined' } },
+    { new: true }
+  );
+  if (!loan) throw new AppError('There is no pending return request for this loan.', 409);
+  await loan.populate(POPULATE);
+  res.json({ loan });
 });
 
 /** Only already-returned (erroneous) records may be removed; active loans must be returned first. */

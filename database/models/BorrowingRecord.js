@@ -11,6 +11,8 @@ const borrowingSchema = new mongoose.Schema(
     returnDate: { type: Date, default: null },
     returnedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     status: { type: String, enum: ['borrowed', 'returned'], default: 'borrowed' },
+    returnRequestStatus: { type: String, enum: ['none', 'pending', 'declined'], default: 'none' },
+    returnRequestedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
@@ -37,6 +39,7 @@ borrowingSchema.index({ userId: 1, status: 1 });
 borrowingSchema.index({ bookId: 1, status: 1 });
 borrowingSchema.index({ status: 1, dueDate: 1 });
 borrowingSchema.index({ borrowDate: -1 });
+borrowingSchema.index({ status: 1, returnRequestStatus: 1 });
 // Database-level guard: a user can hold only one active loan per book (stops double-click races)
 borrowingSchema.index({ userId: 1, bookId: 1 }, { unique: true, partialFilterExpression: { status: 'borrowed' } });
 

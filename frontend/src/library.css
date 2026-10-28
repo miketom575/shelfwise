@@ -216,3 +216,161 @@
   .bay { animation: none; }
   .walker.go .leg-a, .walker.go .leg-b, .walker.go svg { animation: none; }
 }
+
+/* ---- Back button (bookcase page) ---- */
+.lib .lib-head a.back.back-btn {
+  display: inline-flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 7px 18px 7px 12px;
+  border: 1px solid #7a5a1c; border-radius: 999px; background: linear-gradient(#5a3417, #3a2210);
+  color: var(--brass-l); font-size: 0.9rem; font-weight: 600; text-decoration: none;
+  box-shadow: 0 3px 0 #1d1005, 0 6px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 220, 160, 0.25);
+  transition: transform 0.15s, filter 0.15s, box-shadow 0.15s;
+}
+.lib .lib-head a.back.back-btn svg { transition: transform 0.15s; }
+.lib .lib-head a.back.back-btn:hover { transform: translateY(-2px); filter: brightness(1.15); }
+.lib .lib-head a.back.back-btn:hover svg { transform: translateX(-3px); }
+.lib .lib-head a.back.back-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #1d1005, inset 0 1px 0 rgba(255, 220, 160, 0.2); }
+.lib .lib-head a.back.back-btn:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+
+/* ---- "?" key button + legend: bottom right ---- */
+.key-wrap { position: absolute; left: auto; right: 14px; bottom: 14px; z-index: 7; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.key-wrap .lib-key { position: static; }
+.key-btn {
+  display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 2px solid #7a5a1c; border-radius: 50%;
+  background: linear-gradient(var(--brass-l), var(--brass)); color: #2b1a05; cursor: pointer;
+  font: 700 1.1rem / 1 var(--serif); box-shadow: 0 3px 6px rgba(0, 0, 0, 0.5); transition: transform 0.15s, filter 0.15s;
+}
+.key-btn:hover { transform: translateY(-2px); filter: brightness(1.1); }
+.key-btn:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+/* ---- Stairs: both identical in size; only a blocked one is smaller. Same floor line as the elevator ---- */
+.s-up, .s-down { top: auto; bottom: 4.5%; }
+.s-up svg, .s-down svg { height: 17cqh; transition: height 0.2s; }
+.s-up:disabled svg, .s-down:disabled svg { height: 11cqh; }
+.stairs:disabled { opacity: 0.5; }
+.stairs:disabled .tagplate { font-size: clamp(8px, min(1.1cqw, 1.9cqh), 13px); }
+
+/* ---- Phone: stairs move in next to the elevator so the right side stays free for the "?" ---- */
+@media (max-width: 640px) {
+  .s-down { left: 28%; }
+  .s-up { left: 72%; }
+  .s-up svg, .s-down svg { height: 9.5cqh; }
+  .s-up:disabled svg, .s-down:disabled svg { height: 6.5cqh; }
+  .lift { top: auto; bottom: 4.5%; }
+  .lift .stairs svg { height: 15cqh; }
+  .stairs .tagplate { padding: 0.1em 0.6em; }
+}
+
+/* ---- Filter: a wooden button on the right that opens a small panel ---- */
+.lib-hud .lib-filter { order: 2; margin-left: auto; }
+.lib-hud .finder { order: 3; flex: 0 1 340px; max-width: 360px; margin-left: 0; }
+.lib-filter { position: relative; display: block; }
+.lib .btn.filter-btn {
+  display: inline-flex; align-items: center; gap: 7px; padding: 7px 16px; border: 1px solid #7a5a1c; border-radius: 999px;
+  background: linear-gradient(#5a3417, #3a2210); color: var(--brass-l); font-size: 0.9rem; font-weight: 600;
+  box-shadow: 0 3px 0 #1d1005, 0 6px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 220, 160, 0.25);
+  transition: transform 0.15s, filter 0.15s, box-shadow 0.15s;
+}
+.lib .btn.filter-btn:hover { background: linear-gradient(#5a3417, #3a2210); transform: translateY(-2px); filter: brightness(1.15); }
+.lib .btn.filter-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #1d1005, inset 0 1px 0 rgba(255, 220, 160, 0.2); }
+.lib .btn.filter-btn.on, .lib .btn.filter-btn[aria-expanded='true'] { background: linear-gradient(var(--brass-l), var(--brass)); color: #2b1a05; }
+.filter-dot { width: 8px; height: 8px; border-radius: 50%; background: #8e2a2a; box-shadow: 0 0 0 2px var(--brass-l); }
+.filter-pop {
+  position: absolute; top: calc(100% + 12px); right: 0; z-index: 30; display: flex; flex-direction: column; gap: 12px;
+  width: min(290px, calc(100vw - 32px)); padding: 14px; border: 2px solid var(--brass); border-radius: 14px;
+  background: linear-gradient(#4a2c15, #2b1709); color: #f3e4c0; box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+}
+.filter-pop label { display: flex; flex-direction: column; gap: 5px; color: var(--brass-l); font: 700 0.8125rem var(--serif); }
+.lib .filter-pop .select { width: 100%; }
+.filter-actions { display: flex; justify-content: flex-end; gap: 8px; }
+@media (max-width: 640px) {
+  .lib-hud .lib-filter { order: 1; }
+  .lib-hud .finder { order: 2; flex-basis: 100%; max-width: none; }
+}
+
+/* ---- Light mode for the catalog (dark mode stays the green look you have now) ---- */
+html:not([data-theme='dark']) .lib { color: #2b1c0e; background: radial-gradient(60% 50% at 50% 0%, rgba(255, 255, 255, 0.5), transparent 70%), linear-gradient(#efe3c8, #e0cfa4); }
+html:not([data-theme='dark']) .lib.at-shelf {
+  background: radial-gradient(60% 45% at 50% 0%, rgba(255, 255, 255, 0.55), transparent 70%),
+    radial-gradient(circle at 20px 20px, rgba(120, 80, 30, 0.08) 2px, transparent 3px) 0 0 / 44px 44px, linear-gradient(#efe3c8, #e0cfa4);
+}
+html:not([data-theme='dark']) .lib.at-shelf::after { background: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.18) 0 2px, transparent 2px 90px), linear-gradient(#b27a43, #8f5f31); }
+html:not([data-theme='dark']) .s-floor { background: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.14) 0 2px, transparent 2px 6.3%), repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px 5.5%), linear-gradient(#d9a76d, #bb8654); }
+html:not([data-theme='dark']) .s-wall { background: radial-gradient(circle at 14px 14px, rgba(120, 80, 30, 0.12) 2px, transparent 3px) 0 0 / 28px 28px, linear-gradient(#efe3c8, #dcc99b); }
+html:not([data-theme='dark']) .s-vig { box-shadow: inset 0 0 10cqh rgba(60, 35, 10, 0.3); }
+html:not([data-theme='dark']) .s-glow { opacity: 0.5; }
+html:not([data-theme='dark']) .lib-head h1 { color: #2b1c0e; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5); }
+html:not([data-theme='dark']) .lib-head p { color: #5b4630; opacity: 1; }
+html:not([data-theme='dark']) .loans h2 { color: #2b1c0e; }
+html:not([data-theme='dark']) .loans li { border: 1px solid #b79a55; border-left: 4px solid #c9a24a; background: #f8efd9; }
+html:not([data-theme='dark']) .loans .when b { color: #7b2323; }
+html:not([data-theme='dark']) .lib .lib-stage a:not(.btn):not(.sp):not(.back-btn) { color: #7b2323; }
+
+/* ---- Search bar in the site's style ---- */
+.lib .lib-hud .finder .input { height: 38px; min-height: 38px; border: 1px solid #7a5a1c; border-radius: 999px; background: #f8efd9; color: #2b1c0e; font-family: inherit; box-shadow: inset 0 2px 4px rgba(60, 35, 10, 0.18), 0 1px 0 rgba(255, 220, 160, 0.2); }
+html[data-theme='dark'] .lib .lib-hud .finder .input { border-color: #8a5a2b; background: #2e1b0e; color: #f3e4c0; }
+.lib .lib-hud .finder .input::placeholder { color: #7a6446; }
+html[data-theme='dark'] .lib .lib-hud .finder .input::placeholder { color: #a99874; }
+.lib .lib-hud .finder .input:focus-visible { outline: 0; border-color: var(--brass-l); box-shadow: 0 0 0 3px rgba(240, 213, 140, 0.35), inset 0 2px 4px rgba(60, 35, 10, 0.18); }
+.lib .lib-hud .finder .input-icon > svg { color: #6b5636; }
+html[data-theme='dark'] .lib .lib-hud .finder .input-icon > svg { color: #c9b58a; }
+
+/* ---- Header fits narrow pages ---- */
+@media (max-width: 640px) {
+  .lib-hud { gap: 8px 10px; padding: 6px 10px; }
+  .hud-exit { font-size: 0.85rem; }
+  .hud-floor { padding: 2px 9px; font-size: 0.85rem; }
+  .lib .btn.filter-btn { padding: 5px 12px; font-size: 0.85rem; }
+  .lib .lib-hud .finder .input { height: 34px; min-height: 34px; font-size: 0.9rem; }
+}
+@media (max-width: 400px) { .hud-exit { font-size: 0; } .hud-exit svg { width: 22px; height: 22px; } }
+
+/* ---- Elevator picker sits above the bookcase plates and the visitor ---- */
+.lift:has(.dock-panel) { z-index: 8; }
+.lift .dock-panel { max-height: 66cqh; overflow-y: auto; }
+.floor-btn b { flex: none; }
+
+/* ---- Books fill the shelf: no gap on the right or above ---- */
+.bay-row { padding-top: 16px; }
+.books { gap: 2px; height: 236px; min-height: 0; padding: 0 6px; }
+.sp { flex: 1 1 var(--w); width: auto; max-width: 120px; height: var(--h); }
+
+/* ---- On-loan books: faded, hatched spine with a red bookmark ribbon showing the timer ---- */
+.sp.out {
+  background: repeating-linear-gradient(135deg, rgba(0, 0, 0, 0.2) 0 4px, transparent 4px 9px), linear-gradient(rgba(96, 92, 86, 0.72), rgba(96, 92, 86, 0.72)), var(--c);
+  box-shadow: inset 3px 0 0 rgba(255, 255, 255, 0.1), inset -2px 0 0 rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+.sp.out::before { border-color: rgba(240, 213, 140, 0.25); }
+.sp.out span { color: #efe6d2; opacity: 0.9; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
+.sp.out .tag {
+  top: -4px; padding: 4px 6px 10px; border: 0; border-radius: 2px 2px 0 0; background: linear-gradient(#b3322e, #8a1f1c); color: #fff3d6;
+  font-size: 0.6rem; letter-spacing: 0.02em; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%);
+}
+
+/* ---- The dotted route guide ---- */
+.guide { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.guide polyline { fill: none; stroke: #fff3d0; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 7 8; vector-effect: non-scaling-stroke; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.55)); }
+.guide-end {
+  position: absolute; z-index: 2; width: clamp(26px, 3.6cqw, 40px); height: clamp(15px, 2cqw, 22px); border: 2px solid #fff3d0; border-radius: 50%;
+  background: rgba(255, 243, 208, 0.2); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); opacity: 0; pointer-events: none; transform: translate(-50%, -50%); transition: opacity 0.15s;
+}
+
+/* ---- Filter and search sit in the page, not in a separate bar ---- */
+.lib-tools { position: relative; z-index: 3; display: flex; flex: none; align-items: center; justify-content: flex-end; gap: 12px; padding: 10px clamp(12px, 3vw, 40px); }
+.lib-tools .finder { flex: 0 1 340px; max-width: 360px; margin-left: 0; }
+.lib .lib-tools .finder .input { height: 38px; min-height: 38px; border: 1px solid #7a5a1c; border-radius: 999px; background: #f8efd9; color: #2b1c0e; font-family: inherit; box-shadow: inset 0 2px 4px rgba(60, 35, 10, 0.18), 0 1px 0 rgba(255, 220, 160, 0.2); }
+html[data-theme='dark'] .lib .lib-tools .finder .input { border-color: #8a5a2b; background: #2e1b0e; color: #f3e4c0; }
+.lib .lib-tools .finder .input::placeholder { color: #7a6446; }
+html[data-theme='dark'] .lib .lib-tools .finder .input::placeholder { color: #a99874; }
+.lib .lib-tools .finder .input:focus-visible { outline: 0; border-color: var(--brass-l); box-shadow: 0 0 0 3px rgba(240, 213, 140, 0.35), inset 0 2px 4px rgba(60, 35, 10, 0.18); }
+.lib .lib-tools .finder .input-icon > svg { color: #6b5636; }
+html[data-theme='dark'] .lib .lib-tools .finder .input-icon > svg { color: #c9b58a; }
+@media (max-width: 640px) {
+  .lib-tools { gap: 8px; padding: 8px 10px; }
+  .lib-tools .finder { flex: 1 1 auto; max-width: none; }
+  .lib .btn.filter-btn { padding: 5px 12px; font-size: 0.85rem; }
+  .lib .lib-tools .finder .input { height: 34px; min-height: 34px; font-size: 0.9rem; }
+}
+
+/* ---- Taller books that fill the shelf ---- */
+.books { --shelf-h: clamp(240px, 34vh, 320px); height: var(--shelf-h); min-height: 0; }
+.sp { height: calc(var(--shelf-h) * var(--hk, 0.9)); }

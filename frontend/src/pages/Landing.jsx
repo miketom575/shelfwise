@@ -26,7 +26,10 @@ export default function Landing() {
       <section className="hero">
         <div className="hero-grid">
           <div>
-            <h1>Find the book. Borrow it. Know when it’s due.</h1>
+            <p className="eyebrow">Minerva · a place to discover</p>
+            <h1>
+              Your next chapter <em>starts here.</em>
+            </h1>
             <p className="hero-lede">
               Search the catalog, see which copies are on the shelf right now, and keep every loan and due date in one place.
             </p>
@@ -39,10 +42,10 @@ export default function Landing() {
             </form>
             <div className="hero-cta">
               {user ? (
-                <Link to={isAdmin ? '/admin' : '/my-borrowings'} className="btn">{isAdmin ? 'Open the admin workspace' : 'See my borrowings'} <ArrowRight size={16} /></Link>
+                <Link to={isAdmin ? '/admin' : '/my-borrowings'} className="btn btn-lg btn-outline">{isAdmin ? 'Open the admin workspace' : 'See my borrowings'} <ArrowRight size={16} /></Link>
               ) : (
                 <>
-                  <Link to="/register" className="btn">Create a free account</Link>
+                  <Link to="/register" className="btn btn-lg btn-outline">Create a free account</Link>
                   <span className="muted" style={{ fontSize: '0.9375rem' }}>No account needed to browse.</span>
                 </>
               )}
@@ -50,7 +53,7 @@ export default function Landing() {
           </div>
 
           <div className="shelf-wrap">
-            <div className="shelf" aria-label="Recently added books">
+            <div className="shelf" aria-label="Recently added books" tabIndex={0}>
               {shelf.loading && !shelf.data
                 ? Array.from({ length: 10 }, (_, i) => <div key={i} className="spine skeleton" style={{ '--h': `${150 + ((i * 37) % 90)}px`, '--w': '40px' }} />)
                 : shelf.data?.data.map((b, i) => <Spine key={b.id} book={b} index={i} />)}
@@ -66,7 +69,7 @@ export default function Landing() {
       <section className="section" aria-labelledby="cats">
         <div className="section-head">
           <h2 id="cats">Browse by category</h2>
-          <Link to="/catalog">View the whole catalog</Link>
+          <Link to="/catalog" className="btn-wood">View the whole catalog <ArrowRight size={16} /></Link>
         </div>
         <div className="cat-grid">
           {(cats.data?.data || []).map((c) => (
@@ -92,7 +95,7 @@ export default function Landing() {
           </li>
           <li>
             <h3>Return it</h3>
-            <p>Hand it back to a librarian, who records the return. Your history keeps every loan.</p>
+            <p>Request the return from My borrowings. A librarian approves it, and your history keeps every loan.</p>
           </li>
         </ol>
       </section>

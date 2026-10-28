@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, Outlet, useMatch, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowDown, ArrowUp, DoorOpen, Filter, Search, X } from 'lucide-react';
+import { Outlet, useMatch, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowDown, ArrowUp, Filter, Search, X } from 'lucide-react';
 import { useLibrary } from '../hooks/useLibrary';
 import { ElevatorPanel } from './ElevatorPanel';
-import { NO_FILTER, buildFloors, buildShelves, categoriesOf, clampFloor, filterActive, floorLabel, floorOfKey, floorPath, parseKey, passes } from '../utils/library';
+import { NO_FILTER, buildFloors, buildShelves, categoriesOf, clampFloor, filterActive, floorOfKey, floorPath, parseKey, passes } from '../utils/library';
 
 const StairsIcon = () => (
   <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" aria-hidden="true"><path d="M3 20h5v-5h5v-5h5V5h3" /></svg>
@@ -45,19 +45,47 @@ function FloorDock({ floor, floors, counts, onTravel }) {
 
 /** Narrow the library: only books that are available (or on loan), and/or from one category. */
 function FilterBar({ filter, setFilter, categories }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef(null);
+  const on = filterActive(filter);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => e.key === 'Escape' && setOpen(false);
+    const onDown = (e) => { if (box.current && !box.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onDown);
+    return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', onDown); };
+  }, [open]);
+
   return (
-    <div className="lib-filter" role="group" aria-label="Filter books">
-      <Filter size={16} aria-hidden="true" />
-      <select className="select" value={filter.avail} onChange={(e) => setFilter({ ...filter, avail: e.target.value })} aria-label="Availability">
-        <option value="any">All books</option>
-        <option value="in">Available now</option>
-        <option value="out">On loan</option>
-      </select>
-      <select className="select" value={filter.category} onChange={(e) => setFilter({ ...filter, category: e.target.value })} aria-label="Category">
-        <option value="">All categories</option>
-        {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-      </select>
-      {filterActive(filter) && <button className="btn btn-sm" type="button" onClick={() => setFilter(NO_FILTER)}><X size={14} /> Clear</button>}
+    <div className="lib-filter" ref={box}>
+      <button type="button" className={`btn btn-sm filter-btn ${on ? 'on' : ''}`} onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="true">
+        <Filter size={15} aria-hidden="true" /> Filter {on && <span className="filter-dot" aria-hidden="true" />}
+      </button>
+      {open && (
+        <div className="filter-pop" role="group" aria-label="Filter books">
+          <label>
+            Availability
+            <select className="select" value={filter.avail} onChange={(e) => setFilter({ ...filter, avail: e.target.value })}>
+              <option value="any">All books</option>
+              <option value="in">Available now</option>
+              <option value="out">On loan</option>
+            </select>
+          </label>
+          <label>
+            Category
+            <select className="select" value={filter.category} onChange={(e) => setFilter({ ...filter, category: e.target.value })}>
+              <option value="">All categories</option>
+              {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </label>
+          <div className="filter-actions">
+            {on && <button className="btn btn-sm" type="button" onClick={() => setFilter(NO_FILTER)}><X size={14} /> Clear</button>}
+            <button className="btn btn-primary btn-sm" type="button" onClick={() => setOpen(false)}>Done</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -157,12 +185,10 @@ export function LibraryLayout() {
   const ctx = { travel, books, shelves, floors, spot, setSpot, filter, setFilter, counts, ready: !!lib.data, error: lib.error, retry: lib.retry };
   return (
     <div className={`lib ${match || onFind ? 'at-shelf' : 'at-floor'}`}>
-      <header className="lib-hud">
-        <Link to="/" className="hud-exit"><DoorOpen size={17} /> Leave library</Link>
-        <span className="hud-floor">{onFind ? 'Search results' : `Floor ${floor} · ${floorLabel(floors[floor - 1] || floors[0])}`}</span>
+      <div className="lib-tools">
         <FilterBar filter={filter} setFilter={setFilter} categories={categories} />
         <Finder />
-      </header>
+      </div>
       <div className="lib-stage" ref={stage}>
         <Outlet context={ctx} />
       </div>

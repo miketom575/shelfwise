@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { Info, Loader2, LogIn, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Info, Loader2, LogIn, ShieldCheck } from 'lucide-react';
 import { api } from '../api/client';
 import { useAsync } from '../hooks/useAsync';
 import { useToast } from '../context/ToastContext';
@@ -56,8 +56,8 @@ export default function BookDetail() {
   return (
     <>
       <nav className="crumbs" aria-label="Breadcrumb">
-        {from && <><Link to={from}>← Back to the bookcase</Link> / </>}
-        <Link to="/catalog">Catalog</Link> / <Link to={`/catalog?category=${encodeURIComponent(book.category)}`}>{book.category}</Link>
+        {from && <Link to={from} className="btn-wood"><ArrowLeft size={16} /> Back to the bookcase</Link>}
+        <span><Link to="/catalog">Catalog</Link> / <Link to={`/catalog?category=${encodeURIComponent(book.category)}`}>{book.category}</Link></span>
       </nav>
       <div className="detail">
         <div className={none ? 'is-out' : ''}><BookCover book={book} /></div>

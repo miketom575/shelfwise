@@ -12,12 +12,26 @@ const CLOSE = 70;       // closer than this many pixels counts as "already there
 const pct = ({ x, y, w, h }) => ({ left: `${(x / W) * 100}%`, top: `${(y / H) * 100}%`, width: `${(w / W) * 100}%`, height: `${(h / H) * 100}%` });
 
 /**
- * Moves the visitor along the walkways, one animation frame at a time.
- * Asking for a new destination mid-walk re-routes from wherever they are right now.
+ * Moves the visitor along clear paths, one animation frame at a time.
+ * `to` is a point, or a function that returns one (used for the stairs and elevator, whose spot changes with the window size).
+ * The visitor remembers the last place they were sent and stays beside it when the window is resized.
  */
 function useWalker(start, sceneRef) {
   const el = useRef(null);
-  const w = useRef({ x: start[0], y: start[1], path: [], then: null, dir: 1, raf: 0, last: 0 });
+  const w = useRef({ x: start[0], y: start[1], path: [], then: null, to: null, dir: 1, raf: 0, last: 0, preview: false });
+  const line = useRef(null); // the dotted route drawn on the floor
+  const end = useRef(null);  // the ring marking where the route ends
+
+  const drawGuide = (pts) => {
+    const l = line.current, e = end.current;
+    if (!l || !e) return;
+    if (!pts || pts.length < 2) { l.setAttribute('points', ''); e.style.opacity = '0'; return; }
+    l.setAttribute('points', pts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' '));
+    const last = pts[pts.length - 1];
+    e.style.left = `${(last[0] / W) * 100}%`;
+    e.style.top = `${(last[1] / H) * 100}%`;
+    e.style.opacity = '1';
+  };
 
   const paint = () => {
     const n = el.current, s = w.current;
@@ -26,8 +40,16 @@ function useWalker(start, sceneRef) {
     n.style.top = `${(s.y / H) * 100}%`;
     n.style.setProperty('--dir', s.dir);
     n.classList.toggle('go', s.path.length > 0);
+    if (s.path.length) drawGuide([[s.x, s.y], ...s.path]); // while walking, the guide shrinks as the visitor goes
+    else if (!s.preview) drawGuide(null);
   };
   const scale = () => [(sceneRef.current?.clientWidth || W) / W, (sceneRef.current?.clientHeight || H) / H];
+  const at = (to) => (typeof to === 'function' ? to() : to);
+  /** A path from where the visitor is now, keeping a body's width away from the bookcases at this window size. */
+  const plan = (to) => {
+    const s = w.current, [sx, sy] = scale(), width = el.current?.offsetWidth || 24;
+    return route([s.x, s.y], at(to), (width / 2 + 4) / sx, 10 / sy);
+  };
 
   const tick = (t) => {
     const s = w.current, [sx, sy] = scale();
@@ -56,23 +78,52 @@ function useWalker(start, sceneRef) {
     goTo(to, then) {
       const s = w.current;
       cancelAnimationFrame(s.raf);
-      s.path = route([s.x, s.y], to);
+      s.to = to;
+      s.preview = false;
+      s.path = plan(to);
       s.then = then;
       s.last = performance.now();
       s.raf = requestAnimationFrame(tick);
     },
     /** Already standing (almost) there? */
     isNear(to) {
-      const s = w.current, [sx, sy] = scale();
-      return Math.hypot((to[0] - s.x) * sx, (to[1] - s.y) * sy) < CLOSE;
+      const s = w.current, [sx, sy] = scale(), p = at(to);
+      return Math.hypot((p[0] - s.x) * sx, (p[1] - s.y) * sy) < CLOSE;
     },
     /** Appear at `to` without walking (also cancels any walk underway). */
     jump(to) {
-      const s = w.current;
+      const s = w.current, p = at(to);
       cancelAnimationFrame(s.raf);
-      s.path = []; s.then = null; s.x = to[0]; s.y = to[1];
+      s.to = to; s.path = []; s.then = null; s.preview = false; s.x = p[0]; s.y = p[1];
       paint();
     },
+    /** Remember where the visitor is standing, without moving them. */
+    anchor(to) { w.current.to = to; },
+    /** The window changed size: stay beside the remembered place (re-routing if mid-walk). */
+    refit() {
+      const s = w.current;
+      if (!s.to) return;
+      if (s.path.length) { s.path = plan(s.to); return; }
+      const p = at(s.to);
+      s.x = p[0]; s.y = p[1]; s.preview = false;
+      paint();
+    },
+
+    guideLine: line,
+    guideEnd: end,
+    /** Preview the walk to `to` as a dotted line (on hover or focus), unless the visitor is already walking. */
+    showGuide(to) {
+      const s = w.current;
+      if (s.path.length) return;
+      s.preview = true;
+      drawGuide([[s.x, s.y], ...plan(to)]);
+    },
+    hideGuide() {
+      const s = w.current;
+      s.preview = false;
+      if (!s.path.length) drawGuide(null);
+    },
+    
   };
 }
 
@@ -157,6 +208,47 @@ function Floor() {
   const [start] = useState(() => spotPoint(spot, floor));
   const walker = useWalker(start, sceneRef);
   const [liftOpen, setLiftOpen] = useState(false);
+  const [keyOpen, setKeyOpen] = useState(false);
+  const spots = { up: useRef(null), down: useRef(null), lift: useRef(null) };
+
+  /** Where a visitor stands for the stairs or elevator, measured from where they are drawn right now (right at any window size). */
+  const standAt = (dir) => () => {
+    const scene = sceneRef.current, btn = spots[dir].current;
+    if (!scene || !btn) return STOPS[dir];
+    const s = scene.getBoundingClientRect(), art = (btn.querySelector('svg') || btn).getBoundingClientRect();
+    return [
+      (art.left + art.width / 2 - s.left) * (W / s.width),
+      (art.top - 6 - s.top) * (H / s.height),
+    ];
+  };
+  /** The place the visitor is standing beside, as a point or a measuring function. */
+  const placeOf = (sp) => {
+    const i = sp?.type === 'shelf' ? floor?.shelves.findIndex((s) => s.key === sp.key) : -1;
+    return i >= 0 ? SLOTS[i].front : standAt(sp?.type === 'up' || sp?.type === 'down' ? sp.type : 'lift');
+  };
+
+  // Once the floor is on screen, stand exactly where the visitor last chose, and stay beside it while the window is resized.
+  useEffect(() => {
+    if (!ready || !sceneRef.current) return undefined;
+    walker.anchor(placeOf(spot));
+    walker.refit();
+    const ro = new ResizeObserver(() => walker.refit());
+    ro.observe(sceneRef.current);
+    return () => ro.disconnect();
+  }, [ready]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The elevator panel closes on Escape or when you click anywhere outside it.
+  useEffect(() => {
+    if (!liftOpen) return undefined;
+    const onKey = (e) => e.key === 'Escape' && setLiftOpen(false);
+    const onDown = (e) => { if (!e.target.closest?.('.lift')) setLiftOpen(false); };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onDown);
+    return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', onDown); };
+  }, [liftOpen]);
+
+  /** Hovering or focusing a place draws the dotted route to it. */
+  const hint = (to) => ({ onMouseEnter: () => walker.showGuide(to), onFocus: () => walker.showGuide(to), onMouseLeave: walker.hideGuide, onBlur: walker.hideGuide });
 
   /** Walk there, unless we're already close (or motion is turned down), then run `then`. */
   const walkTo = (to, then) => {
@@ -165,12 +257,12 @@ function Floor() {
   };
   const openShelf = (shelf) => { setSpot({ type: 'shelf', key: shelf.key }); navigate(shelfPath(shelf)); };
   const visit = (shelf, slot) => walkTo(slot.front, () => openShelf(shelf));
-  const takeStairs = (dir) => walkTo(STOPS[dir], () => travel(dir === 'up' ? floorNo + 1 : floorNo - 1));
-  const callLift = () => walkTo(STOPS.lift, () => setLiftOpen((o) => !o));
+  const takeStairs = (dir) => walkTo(standAt(dir), () => travel(dir === 'up' ? floorNo + 1 : floorNo - 1));
+  const callLift = () => walkTo(standAt('lift'), () => setLiftOpen((o) => !o));
   // Double-click skips the walking and goes straight there.
   const skipToShelf = (shelf, slot) => { walker.jump(slot.front); openShelf(shelf); };
-  const skipToStairs = (dir) => { walker.jump(STOPS[dir]); travel(dir === 'up' ? floorNo + 1 : floorNo - 1); };
-  const skipToLift = () => { walker.jump(STOPS.lift); setLiftOpen(true); };
+  const skipToStairs = (dir) => { walker.jump(standAt(dir)); travel(dir === 'up' ? floorNo + 1 : floorNo - 1); };
+  const skipToLift = () => { walker.jump(standAt('lift')); setLiftOpen(true); };
 
   const active = filterActive(filter);
   const hitsOf = (shelf) => (active ? shelf.books.filter((b) => passes(b, filter)).length : shelf.books.length);
@@ -198,6 +290,7 @@ function Floor() {
               key={shelf.key}
               className={`slot ${active ? (hits ? 'hit' : 'dim') : ''}`}
               style={pct(slot)}
+              {...hint(slot.front)}
               onClick={() => visit(shelf, slot)}
               onDoubleClick={() => skipToShelf(shelf, slot)}
               aria-label={`Bookcase ${name}, ${plural(shelf.books.length, 'book')}${active ? `, ${plural(hits, 'match', 'matches')}` : ''}`}
@@ -210,20 +303,22 @@ function Floor() {
           );
         })}
 
-        <button className="stairs s-up" onClick={() => takeStairs('up')} onDoubleClick={() => skipToStairs('up')} disabled={floorNo >= floors.length}>
+        <button className="stairs s-up" ref={spots.up} {...hint(standAt('up'))} onClick={() => takeStairs('up')} onDoubleClick={() => skipToStairs('up')} disabled={floorNo >= floors.length}>
           <StairsArt id="up" flip /><span className="tagplate">Stairs up</span>
         </button>
-        <button className="stairs s-down" onClick={() => takeStairs('down')} onDoubleClick={() => skipToStairs('down')} disabled={floorNo <= 1}>
+        <button className="stairs s-down" ref={spots.down} {...hint(standAt('down'))} onClick={() => takeStairs('down')} onDoubleClick={() => skipToStairs('down')} disabled={floorNo <= 1}>
           <StairsArt id="down" /><span className="tagplate">Stairs down</span>
         </button>
 
         <div className="lift">
           {liftOpen && <ElevatorPanel floors={floors} current={floorNo} counts={counts} onPick={(n) => { setLiftOpen(false); travel(n, true); }} />}
-          <button className="stairs" onClick={callLift} onDoubleClick={skipToLift} aria-expanded={liftOpen}>
+          <button className="stairs" ref={spots.lift} {...hint(standAt('lift'))} onClick={callLift} onDoubleClick={skipToLift} aria-expanded={liftOpen}>
             <ElevatorArt floor={floorNo} total={floors.length} /><span className="tagplate">Elevator</span>
           </button>
         </div>
 
+        <svg className="guide" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true"><polyline ref={walker.guideLine} points="" /></svg>
+        <i className="guide-end" ref={walker.guideEnd} aria-hidden="true" />
         <i className="walker" ref={walker.el} style={{ left: `${(start[0] / W) * 100}%`, top: `${(start[1] / H) * 100}%` }} aria-hidden="true">
           <svg viewBox="0 0 24 44">
             <g className="leg-a"><rect x="7" y="29" width="4.5" height="13" rx="2" fill="#3b2a1a" /><rect x="6.5" y="40" width="6" height="3.5" rx="1.5" fill="#1d1005" /></g>
@@ -240,13 +335,28 @@ function Floor() {
         <div className="s-vig" />
       </div>
 
-      <ul className="lib-key" aria-label="Key">
-        <li><i /> On the shelf</li>
-        <li><i className="out" /> On loan</li>
-        <li><i className="gap" /> Free space</li>
-        {active && <li><i className="faded" /> Doesn’t match your filter</li>}
-        <li className="tip">Double-click a bookcase to skip the walk</li>
-      </ul>
+      <div className="key-wrap">
+        {keyOpen && (
+          <ul className="lib-key" id="lib-key" aria-label="Key">
+            <li><i /> On the shelf</li>
+            <li><i className="out" /> On loan</li>
+            <li><i className="gap" /> Free space</li>
+            {active && <li><i className="faded" /> Doesn’t match your filter</li>}
+            <li className="tip">Double-click a bookcase to skip the walk</li>
+          </ul>
+        )}
+        <button
+          type="button"
+          className="key-btn"
+          onClick={() => setKeyOpen((o) => !o)}
+          aria-expanded={keyOpen}
+          aria-controls="lib-key"
+          aria-label={keyOpen ? 'Hide the key' : 'Show the key'}
+          title="Key"
+        >
+          {keyOpen ? '×' : '?'}
+        </button>
+      </div>
       <ul className="chips" aria-label="Library summary">
         {active ? (
           <>

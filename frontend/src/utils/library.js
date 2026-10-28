@@ -30,24 +30,93 @@ export const RUNNERS = [
   [70, 132, 1060, 56], [70, 275, 1060, 56], [70, 395, 1060, 56], [70, 497, 1060, 56],
 ];
 
-/** Where visitors stand in the lobby, the three vertical walkways, and the open horizontal aisles between the bookcases. */
-export const STOPS = { lift: [600, 525], up: [1092, 525], down: [108, 525] };
-const CORRIDORS = [197, 600, 1003];
-const AISLES = [160, 303, 423, 525];
-const nearest = (list, v) => list.reduce((a, b) => (Math.abs(b - v) < Math.abs(a - v) ? b : a));
+/** Fallback stand-points for the stairs and elevator (the floor page measures the real ones from the screen). */
+export const STOPS = { lift: [600, 528], up: [1092, 690], down: [108, 690] };
 
-/** Waypoints from one spot to another that stay on the walkways (never through a bookcase). */
-export function route(from, to) {
-  const cf = nearest(CORRIDORS, from[0]), ct = nearest(CORRIDORS, to[0]);
-  const pts = [];
-  if (from[0] !== cf) pts.push([cf, from[1]]);                 // step onto the nearest walkway
-  if (cf === ct) pts.push([cf, to[1]]);                         // walk along it
-  else {
-    const a = nearest(AISLES, to[1]);                           // cross over on an open aisle
-    pts.push([cf, a], [ct, a], [ct, to[1]]);
+/** Where feet may go, and how far to keep from a bookcase (in drawing units; the floor page passes in sizes that fit the screen). */
+const WALK = { x0: 24, x1: 1176, y0: 140, y1: 735 };
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const zones = (mx, my) => SLOTS.map((s) => ({ x0: s.x - mx, y0: s.y - my, x1: s.x + s.w + mx, y1: s.y + s.h + my }));
+const inside = (p, r) => p[0] > r.x0 && p[0] < r.x1 && p[1] > r.y0 && p[1] < r.y1;
+
+/** Does the straight line a-b pass through the inside of rectangle r? (Touching the edge is fine.) */
+function crosses(a, b, r) {
+  const e = 0.01, dx = b[0] - a[0], dy = b[1] - a[1];
+  let t0 = 0, t1 = 1;
+  const sides = [[-dx, a[0] - (r.x0 + e)], [dx, r.x1 - e - a[0]], [-dy, a[1] - (r.y0 + e)], [dy, r.y1 - e - a[1]]];
+  for (const [p, q] of sides) {
+    if (p === 0) { if (q < 0) return false; continue; }
+    const t = q / p;
+    if (p < 0) { if (t > t1) return false; if (t > t0) t0 = t; } else { if (t < t0) return false; if (t < t1) t1 = t; }
   }
-  pts.push(to);
-  return pts.filter((p, i) => i === 0 ? (p[0] !== from[0] || p[1] !== from[1]) : (p[0] !== pts[i - 1][0] || p[1] !== pts[i - 1][1]));
+  return t0 < t1;
+}
+
+/** Nudges a point out of any bookcase's clear zone, and keeps it on the floor. */
+function freed(p, boxes) {
+  let x = clamp(p[0], WALK.x0, WALK.x1), y = clamp(p[1], WALK.y0, WALK.y1);
+  for (let n = 0; n < 4; n++) {
+    const r = boxes.find((b) => inside([x, y], b));
+    if (!r) break;
+    const side = [x - r.x0, r.x1 - x, y - r.y0, r.y1 - y];
+    const k = side.indexOf(Math.min(...side));
+    if (k === 0) x = r.x0; else if (k === 1) x = r.x1; else if (k === 2) y = r.y0; else y = r.y1;
+  }
+  return [x, y];
+}
+
+/**
+ * Shortest walk from one spot to another that never goes through a bookcase.
+ * It goes straight when it can and only bends around the corners of bookcases, so there are no detours.
+ * mx / my = how far to stay from a bookcase sideways / up-down.
+ */
+export function route(from, to, mx = 16, my = 10) {
+  const boxes = zones(mx, my);
+  const clear = (p, q, list = boxes) => !list.some((r) => crosses(p, q, r));
+  const a = freed(from, boxes), b = freed(to, boxes);
+  const nodes = [a, b];
+  boxes.forEach((r) => [[r.x0, r.y0], [r.x1, r.y0], [r.x0, r.y1], [r.x1, r.y1]].forEach((c) => {
+    if (c[0] >= WALK.x0 && c[0] <= WALK.x1 && c[1] >= WALK.y0 && c[1] <= WALK.y1 && !boxes.some((z) => inside(c, z))) nodes.push(c);
+  }));
+
+  // Dijkstra over the "who can see whom" graph.
+  const n = nodes.length, dist = Array(n).fill(Infinity), prev = Array(n).fill(-1), done = Array(n).fill(false);
+  dist[0] = 0;
+  for (;;) {
+    let u = -1;
+    for (let i = 0; i < n; i++) if (!done[i] && (u < 0 || dist[i] < dist[u])) u = i;
+    if (u < 0 || dist[u] === Infinity || u === 1) break;
+    done[u] = true;
+    for (let v = 0; v < n; v++) {
+      if (done[v]) continue;
+      const d = dist[u] + Math.hypot(nodes[u][0] - nodes[v][0], nodes[u][1] - nodes[v][1]);
+      if (d < dist[v] && clear(nodes[u], nodes[v])) { dist[v] = d; prev[v] = u; }
+    }
+  }
+  const mid = [];
+  if (prev[1] >= 0) for (let i = prev[1]; i > 0; i = prev[i]) mid.unshift(nodes[i]);
+  let pts = [...mid, b];
+
+  // Round the corners a little (only where there is room), so turns look like a stride, not a snap.
+  const soft = zones(mx * 0.4, my * 0.4);
+  const out = [];
+  let before = a;
+  pts.forEach((c, i) => {
+    const next = pts[i + 1];
+    if (!next) { out.push(c); return; }
+    const l1 = Math.hypot(c[0] - before[0], c[1] - before[1]), l2 = Math.hypot(next[0] - c[0], next[1] - c[1]);
+    const k = Math.min(28, l1 / 2, l2 / 2);
+    if (k < 2) { out.push(c); before = c; return; }
+    const p1 = [c[0] + ((before[0] - c[0]) * k) / l1, c[1] + ((before[1] - c[1]) * k) / l1];
+    const p2 = [c[0] + ((next[0] - c[0]) * k) / l2, c[1] + ((next[1] - c[1]) * k) / l2];
+    const seq = [p1, ...[0.25, 0.5, 0.75].map((t) => [(1 - t) ** 2 * p1[0] + 2 * (1 - t) * t * c[0] + t * t * p2[0], (1 - t) ** 2 * p1[1] + 2 * (1 - t) * t * c[1] + t * t * p2[1]]), p2];
+    if (seq.every((q, j) => j === 0 || clear(seq[j - 1], q, soft))) out.push(...seq); else out.push(c);
+    before = c;
+  });
+  pts = out;
+  if (a[0] !== from[0] || a[1] !== from[1]) pts.unshift(a);
+  if (b[0] !== to[0] || b[1] !== to[1]) pts.push(to);
+  return pts.filter((p, i) => (i === 0 ? p[0] !== from[0] || p[1] !== from[1] : p[0] !== pts[i - 1][0] || p[1] !== pts[i - 1][1]));
 }
 
 /** Where the visitor appears when a floor opens: beside the bookcase they just left, or where they arrived. */

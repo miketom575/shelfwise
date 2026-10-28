@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, BookMarked, History } from 'lucide-react';
+import { AlertTriangle, BookMarked, CheckCheck, Clock, History, RotateCcw } from 'lucide-react';
 import { api, qs } from '../api/client';
 import { useAsync } from '../hooks/useAsync';
+import { useToast } from '../context/ToastContext';
 import { BookCover } from '../components/BookCover';
-import { EmptyState, ErrorState, LoanBadge, Pagination, TableSkeleton } from '../components/Ui';
+import { ConfirmDialog, EmptyState, ErrorState, LoanBadge, Pagination, TableSkeleton } from '../components/Ui';
 import { daysFromToday, fmtDate, fmtShort, plural, relativeDay } from '../utils/format';
 
 function stampFor(loan) {
@@ -16,11 +17,13 @@ function stampFor(loan) {
 }
 
 /** Styled like the date-due slip glued inside a library book */
-function Slip({ loan }) {
+function Slip({ loan, onReturn }) {
   const book = loan.bookId || {};
   const s = stampFor(loan);
+  const pending = loan.returnRequestStatus === 'pending';
+  const declined = loan.returnRequestStatus === 'declined';
   return (
-    <article className={`slip ${s.cls === 'late' ? 'late' : ''}`}>
+    <article className={`slip ${s.cls === 'late' ? 'late' : ''} ${pending ? 'is-pending' : ''}`}>
       <BookCover book={{ title: book.title || 'Removed book', author: book.author || '', category: book.category || '' }} small />
       <div>
         <h3>{book.id ? <Link to={`/books/${book.id}`}>{book.title}</Link> : 'Removed book'}</h3>
@@ -31,20 +34,48 @@ function Slip({ loan }) {
           <div><dt>Return to</dt><dd>Library desk</dd></div>
         </dl>
         <span className={`stamp ${s.cls}`} title={`Due ${relativeDay(loan.dueDate)}`}>{s.text}</span>
+
+        {pending ? (
+          <p className="return-note pending" role="status"><Clock size={16} /> Return requested{loan.returnRequestedAt ? ` ${fmtShort(loan.returnRequestedAt)}` : ''}. Waiting for a librarian to approve it.</p>
+        ) : (
+          <>
+            {declined && <p className="return-note declined" role="status"><AlertTriangle size={16} /> A librarian declined your last return request. Check with the library desk, then try again.</p>}
+            <button className="btn btn-primary return-btn" onClick={() => onReturn(loan)}>
+              {declined ? <RotateCcw size={16} /> : <CheckCheck size={16} />} {declined ? 'Request return again' : 'Return book'}
+            </button>
+          </>
+        )}
       </div>
     </article>
   );
 }
 
 export default function MyBorrowings() {
+  const toast = useToast();
   const [tab, setTab] = useState('borrowed');
   const [page, setPage] = useState(1);
+  const [confirm, setConfirm] = useState(null);
+  const [busy, setBusy] = useState(false);
   const { data, error, loading, retry } = useAsync(
     (signal) => api.get(`/borrowings${qs({ status: tab, page, limit: tab === 'borrowed' ? 50 : 10 })}`, { signal }),
     [tab, page]
   );
   const counts = data?.counts;
   const pick = (t) => { setTab(t); setPage(1); };
+
+  const requestReturn = async () => {
+    setBusy(true);
+    try {
+      await api.post(`/borrowings/${confirm.id}/return-request`);
+      toast.success('Return requested. It moves to your history once a librarian approves it.');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setBusy(false);
+      setConfirm(null);
+      retry();
+    }
+  };
 
   return (
     <>
@@ -72,10 +103,10 @@ export default function MyBorrowings() {
             When you borrow a book, its due date shows up here.
           </EmptyState>
         ) : (
-          <div className="slips">{data.data.map((l) => <Slip key={l.id} loan={l} />)}</div>
+          <div className="slips">{data.data.map((l) => <Slip key={l.id} loan={l} onReturn={setConfirm} />)}</div>
         )
       ) : data.data.length === 0 ? (
-        <EmptyState icon={History} title="No returned books yet">Your history fills in as you return books.</EmptyState>
+        <EmptyState icon={History} title="No returned books yet">Your history fills in once a librarian approves a return.</EmptyState>
       ) : (
         <>
           <div className="table-wrap" style={{ marginTop: 22 }}>
@@ -96,6 +127,12 @@ export default function MyBorrowings() {
           </div>
           <Pagination page={data.page} pages={data.pages} onChange={setPage} />
         </>
+      )}
+
+      {confirm && (
+        <ConfirmDialog title="Return this book?" confirmLabel="Request return" busy={busy} onConfirm={requestReturn} onCancel={() => setConfirm(null)}>
+          This sends “{confirm.bookId?.title}” back to the library desk. A librarian has to approve the return. Until then it stays on your list as pending.
+        </ConfirmDialog>
       )}
     </>
   );

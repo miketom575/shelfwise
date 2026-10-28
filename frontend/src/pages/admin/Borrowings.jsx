@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CheckCheck, Download, ClipboardX, Search } from 'lucide-react';
+import { CheckCheck, ClipboardX, Clock, Download, Search, X } from 'lucide-react';
 import { api, qs } from '../../api/client';
 import { useAsync } from '../../hooks/useAsync';
 import { useDebounce } from '../../hooks/useDebounce';
@@ -7,7 +7,7 @@ import { useToast } from '../../context/ToastContext';
 import { ConfirmDialog, EmptyState, ErrorState, LoanBadge, Pagination, TableSkeleton } from '../../components/Ui';
 import { fmtDate, relativeDay } from '../../utils/format';
 
-const TABS = [['', 'All', 'all'], ['borrowed', 'On loan', 'borrowed'], ['overdue', 'Overdue', 'overdue'], ['returned', 'Returned', 'returned']];
+const TABS = [['', 'All', 'all'], ['pending', 'Return requests', 'pending'], ['borrowed', 'On loan', 'borrowed'], ['overdue', 'Overdue', 'overdue'], ['returned', 'Returned', 'returned']];
 
 export default function AdminBorrowings() {
   const toast = useToast();
@@ -15,28 +15,34 @@ export default function AdminBorrowings() {
   const [q, setQ] = useState('');
   const dq = useDebounce(q, 300);
   const [page, setPage] = useState(1);
-  const [confirm, setConfirm] = useState(null);
+  const [confirm, setConfirm] = useState(null); // { loan, action: 'approve' | 'decline' }
   const [busy, setBusy] = useState(false);
 
   useEffect(() => setPage(1), [status, dq]);
   const { data, error, loading, retry } = useAsync((signal) => api.get(`/borrowings${qs({ status, q: dq, page, limit: 10 })}`, { signal }), [status, dq, page]);
 
-  const markReturned = async () => {
+  const decide = async () => {
+    const { loan, action } = confirm;
     setBusy(true);
     try {
-      await api.put(`/borrowings/${confirm.id}`, { status: 'returned' });
-      toast.success('Return recorded. The copy is back on the shelf.');
-      setConfirm(null);
+      if (action === 'decline') {
+        await api.put(`/borrowings/${loan.id}/return-request`, { decision: 'declined' });
+        toast.success('Return declined. The loan stays active and the reader can request again.');
+      } else {
+        await api.put(`/borrowings/${loan.id}`, { status: 'returned' });
+        toast.success('Return approved. The copy is back on the shelf and the loan is in the reader’s history.');
+      }
     } catch (err) {
       toast.error(err.message);
-      setConfirm(null);
-    } finally { setBusy(false); retry(); }
+    } finally { setBusy(false); setConfirm(null); retry(); }
   };
+
+  const waiting = data?.counts?.pending || 0;
 
   return (
     <>
       <div className="page-head">
-        <div><h1>Borrowings</h1><p>Every loan, who has it, and when it’s due back.</p></div>
+        <div><h1>Borrowings</h1><p>Every loan, who has it, and when it’s due back.{waiting > 0 && <> <strong>{waiting}</strong> return {waiting === 1 ? 'request is' : 'requests are'} waiting for you.</>}</p></div>
         <a className="btn" href={`/api/borrowings/export${qs({ status, q: dq })}`} download><Download size={16} /> Export CSV</a>
       </div>
 
@@ -52,7 +58,7 @@ export default function AdminBorrowings() {
       </div>
 
       {error && !data ? <ErrorState error={error} onRetry={retry} /> : loading && !data ? <TableSkeleton /> : data.total === 0 ? (
-        <EmptyState icon={ClipboardX} title="No loans match">Try another status or search term.</EmptyState>
+        <EmptyState icon={ClipboardX} title={status === 'pending' ? 'No return requests' : 'No loans match'}>{status === 'pending' ? 'When a reader asks to return a book, it shows up here for you to approve.' : 'Try another status or search term.'}</EmptyState>
       ) : (
         <>
           <div className="table-wrap" style={{ opacity: loading ? 0.6 : 1 }}>
@@ -60,19 +66,33 @@ export default function AdminBorrowings() {
               <caption className="sr-only">Borrowing records</caption>
               <thead><tr><th>Borrower</th><th>Book</th><th>Borrowed</th><th>Due</th><th>Returned</th><th>Status</th><th className="actions"><span className="sr-only">Actions</span></th></tr></thead>
               <tbody>
-                {data.data.map((l) => (
-                  <tr key={l.id}>
-                    <td><div style={{ fontWeight: 600 }}>{l.userId?.name || 'Deleted user'}</div><div className="sub">{l.userId?.email}</div></td>
-                    <td><div className="title-cell">{l.bookId?.title || 'Deleted book'}</div><div className="sub">{l.bookId?.author}</div></td>
-                    <td className="num">{fmtDate(l.borrowDate)}</td>
-                    <td className="num">{fmtDate(l.dueDate)}{l.status === 'borrowed' && <div className="sub" style={{ color: l.isOverdue ? 'var(--stamp)' : undefined }}>{relativeDay(l.dueDate)}</div>}</td>
-                    <td className="num">{fmtDate(l.returnDate)}</td>
-                    <td><LoanBadge status={l.displayStatus} /></td>
-                    <td className="actions">
-                      {l.status === 'borrowed' && <button className="btn btn-sm btn-primary" onClick={() => setConfirm(l)}><CheckCheck size={15} /> Mark returned</button>}
-                    </td>
-                  </tr>
-                ))}
+                {data.data.map((l) => {
+                  const pending = l.status === 'borrowed' && l.returnRequestStatus === 'pending';
+                  return (
+                    <tr key={l.id}>
+                      <td><div style={{ fontWeight: 600 }}>{l.userId?.name || 'Deleted user'}</div><div className="sub">{l.userId?.email}</div></td>
+                      <td><div className="title-cell">{l.bookId?.title || 'Deleted book'}</div><div className="sub">{l.bookId?.author}</div></td>
+                      <td className="num">{fmtDate(l.borrowDate)}</td>
+                      <td className="num">{fmtDate(l.dueDate)}{l.status === 'borrowed' && <div className="sub" style={{ color: l.isOverdue ? 'var(--stamp)' : undefined }}>{relativeDay(l.dueDate)}</div>}</td>
+                      <td className="num">{fmtDate(l.returnDate)}</td>
+                      <td>
+                        <LoanBadge status={l.displayStatus} />
+                        {pending && <div className="sub"><span className="badge badge-pending"><Clock size={12} /> Return requested</span></div>}
+                        {l.status === 'borrowed' && l.returnRequestStatus === 'declined' && <div className="sub">Last request declined</div>}
+                      </td>
+                      <td className="actions">
+                        {pending ? (
+                          <div className="row" style={{ '--gap': '6px', justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
+                            <button className="btn btn-sm btn-primary" onClick={() => setConfirm({ loan: l, action: 'approve' })}><CheckCheck size={15} /> Approve</button>
+                            <button className="btn btn-sm" onClick={() => setConfirm({ loan: l, action: 'decline' })}><X size={15} /> Decline</button>
+                          </div>
+                        ) : l.status === 'borrowed' && (
+                          <button className="btn btn-sm" onClick={() => setConfirm({ loan: l, action: 'approve' })}><CheckCheck size={15} /> Mark returned</button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -81,8 +101,17 @@ export default function AdminBorrowings() {
       )}
 
       {confirm && (
-        <ConfirmDialog title="Record this return?" confirmLabel="Mark returned" busy={busy} onConfirm={markReturned} onCancel={() => setConfirm(null)}>
-          {confirm.userId?.name} is returning “{confirm.bookId?.title}”. One copy goes back on the shelf, and the loan stays in the history.
+        <ConfirmDialog
+          title={confirm.action === 'decline' ? 'Decline this return?' : 'Approve this return?'}
+          confirmLabel={confirm.action === 'decline' ? 'Decline' : 'Approve return'}
+          danger={confirm.action === 'decline'}
+          busy={busy}
+          onConfirm={decide}
+          onCancel={() => setConfirm(null)}
+        >
+          {confirm.action === 'decline'
+            ? <>{confirm.loan.userId?.name} asked to return “{confirm.loan.bookId?.title}”. Declining keeps the loan active, and they can ask again.</>
+            : <>{confirm.loan.userId?.name} is returning “{confirm.loan.bookId?.title}”. One copy goes back on the shelf, and the loan moves to their history.</>}
         </ConfirmDialog>
       )}
     </>

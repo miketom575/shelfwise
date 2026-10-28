@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { AlertCircle, CheckCircle2, Eye, EyeOff, Loader2, ShieldAlert } from 'lucide-react';
+import { AlertCircle, ArrowUpRight, BookOpen, CheckCircle2, Eye, EyeOff, Loader2, Lock, ShieldAlert } from 'lucide-react';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -14,6 +14,27 @@ function PasswordInput({ id, value, onChange, invalid, autoComplete, describedBy
       <button type="button" className="btn btn-ghost btn-icon btn-sm" style={{ position: 'absolute', right: 4, top: 5 }} onClick={() => setShow((s) => !s)} aria-label={show ? 'Hide password' : 'Show password'}>
         {show ? <EyeOff size={17} /> : <Eye size={17} />}
       </button>
+    </div>
+  );
+}
+
+/** The two-column frame shared by sign in, register and the suspended notice: a welcome panel beside the form card. */
+function AuthShell({ children }) {
+  return (
+    <div className="auth-shell">
+      <aside className="auth-aside">
+        <p className="eyebrow"><BookOpen size={16} aria-hidden="true" /> The Minerva Library</p>
+        <p className="aside-title">A little curiosity.<br />A whole <em>new world.</em></p>
+        <p className="aside-lede">A place to discover, to get lost in a good book, and to find your next chapter.</p>
+        <div className="aside-books" aria-hidden="true">
+          <i className="ab ab1"><b>The art of reading</b></i>
+          <i className="ab ab2"><b>Stories &amp; ideas</b></i>
+          <i className="ab ab3"><b>A world within</b></i>
+          <i className="ab ab4"><b>Minerva</b></i>
+        </div>
+        <Link to="/catalog" className="aside-link">Explore the collection <ArrowUpRight size={16} aria-hidden="true" /></Link>
+      </aside>
+      {children}
     </div>
   );
 }
@@ -44,7 +65,7 @@ function Suspended({ info, creds, onBack }) {
   };
 
   return (
-    <div className="auth">
+    <AuthShell>
       <div className="auth-card panel panel-pad">
         <h1>Account suspended</h1>
         <div className="alert alert-error" role="alert" style={{ marginTop: 14 }}><ShieldAlert size={18} /> {info.message}</div>
@@ -62,7 +83,7 @@ function Suspended({ info, creds, onBack }) {
         )}
         <p className="muted" style={{ marginTop: 18 }}><button type="button" className="btn btn-ghost btn-sm" onClick={onBack}>Back to sign in</button></p>
       </div>
-    </div>
+    </AuthShell>
   );
 }
 
@@ -103,10 +124,11 @@ export function Login() {
   if (suspended) return <Suspended info={suspended} creds={{ email: form.email.trim(), password: form.password }} onBack={() => setSuspended(null)} />;
 
   return (
-    <div className="auth">
+    <AuthShell>
       <div className="auth-card panel panel-pad">
-        <h1>Sign in</h1>
-        <p className="sub">Pick up where you left off.</p>
+        <p className="eyebrow">Your reading space</p>
+        <h1>Welcome back.</h1>
+        <p className="sub">Sign in to continue your next chapter.</p>
         <form onSubmit={submit} noValidate className="stack" style={{ '--gap': '16px' }}>
           {error && <div className="alert alert-error" role="alert"><AlertCircle size={18} /> {error}</div>}
           <Field label="Email" htmlFor="email" error={fields.email}>
@@ -119,15 +141,16 @@ export function Login() {
             {busy && <Loader2 size={18} className="spin" />} Sign in
           </button>
         </form>
-        <p className="muted" style={{ marginTop: 18 }}>New here? <Link to="/register">Create an account</Link></p>
+        <p className="auth-switch">New here? <Link to="/register">Create an account</Link></p>
         <div className="demo-box">
           Demo accounts after seeding:{' '}
           <button type="button" onClick={() => fill('reader@library.test', 'Reader@12345')}>use the reader</button>{' or '}
           <button type="button" onClick={() => fill('admin@library.test', 'Admin@12345')}>use the librarian</button>{' or '}
           <button type="button" onClick={() => fill('overdue@library.test', 'Reader@12345')}>try the suspended reader</button>.
         </div>
+        <p className="auth-note"><Lock size={15} aria-hidden="true" /> Sign out when using a shared device.</p>
       </div>
-    </div>
+    </AuthShell>
   );
 }
 
@@ -171,7 +194,7 @@ export function Register() {
   };
 
   return (
-    <div className="auth">
+    <AuthShell>
       <div className="auth-card panel panel-pad">
         <h1>Create your account</h1>
         <p className="sub">Borrow books and keep track of due dates.</p>
@@ -186,7 +209,7 @@ export function Register() {
           <Field label="Password" htmlFor="password" error={fields.password}>
             <PasswordInput id="password" value={form.password} onChange={set('password')} invalid={!!fields.password} autoComplete="new-password" />
             <div className="pw-meter" aria-hidden="true">{RULES.map((_, i) => <i key={i} className={i < passed ? 'on' : ''} />)}</div>
-            <span className="hint">{RULES.map(([l, t]) => `${t(form.password) ? '✓' : '○'} ${l}`).join('   ')}</span>
+            <span className="hint">{RULES.map(([l, t]) => `${t(form.password) ? '●' : '○'} ${l}`).join('   ')}</span>
           </Field>
           <Field label="Confirm password" htmlFor="confirm" error={fields.confirm}>
             <PasswordInput id="confirm" value={form.confirm} onChange={set('confirm')} invalid={!!fields.confirm} autoComplete="new-password" />
@@ -195,8 +218,8 @@ export function Register() {
             {busy && <Loader2 size={18} className="spin" />} Create account
           </button>
         </form>
-        <p className="muted" style={{ marginTop: 18 }}>Already registered? <Link to="/login">Sign in</Link></p>
+        <p className="auth-switch">Already registered? <Link to="/login">Sign in</Link></p>
       </div>
-    </div>
+    </AuthShell>
   );
 }

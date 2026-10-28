@@ -55,7 +55,7 @@ function Spine({ book, now }) {
       to={`/books/${book.id}`}
       state={{ from: `${loc.pathname}${loc.search}` }}
       className={`sp ${out(book) ? 'out' : ''}`}
-      style={{ '--c': bg, '--ink': ink, '--h': `${170 + (h % 40)}px`, '--w': `${34 + ((h >> 4) % 14)}px` }}
+      style={{ '--c': bg, '--ink': ink, '--hk': 0.84 + (h % 14) / 100, '--w': `${34 + ((h >> 4) % 14)}px` }}
       data-tip={tip}
       aria-label={`${book.title} by ${book.author}. ${timer}.`}
     >
@@ -144,7 +144,7 @@ export default function Shelf() {
     <div className="shelf-page">
       <div className="lib-head">
         <div>
-          {view && <Link to={view.back} className="back"><ArrowLeft size={16} /> {view.backLabel}</Link>}
+          {view && <Link to={view.back} className="back back-btn"><ArrowLeft size={16} /> {view.backLabel}</Link>}
           <h1>{view ? view.title : 'Bookcase'}</h1>
           <p>
             {view ? <>{view.blurb}{active ? ` Your filter shows ${shown.length} of ${view.books.length} here.` : ''} Hover a book for its title, or select it to see its details. Every book has a timer: gray books are on loan ({loans.length} here) and count down to their return, and “now” means you can borrow it today.</> : ready ? 'We can’t find that bookcase.' : 'Opening the bookcase…'}

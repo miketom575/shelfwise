@@ -93,7 +93,7 @@ async function returnLoan(loanId, adminUser) {
   // Flip status only if still active -> a repeat/double return can never match twice.
   const loan = await Borrowing.findOneAndUpdate(
     { _id: loanId, status: 'borrowed' },
-    { $set: { status: 'returned', returnDate: new Date(), returnedBy: adminUser._id } },
+    { $set: { status: 'returned', returnDate: new Date(), returnedBy: adminUser._id, returnRequestStatus: 'none' } },
     { new: true }
   );
   if (!loan) {
