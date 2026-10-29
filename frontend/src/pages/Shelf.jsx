@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useMatch, useOutletContext, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useMatch, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight, ListFilter, SearchX } from 'lucide-react';
 import { EmptyState, ErrorState, TableSkeleton } from '../components/Ui';
 import { fmtDate, hash, plural } from '../utils/format';
+import { openBook } from '../utils/bookOpen';
 import { NO_FILTER, SHELF_CAP, SPINES, filterActive, findShelf, floorOfKey, floorPath, letterName, parseKey, passes, shelfLabel, shelfPath } from '../utils/library';
 
 const BOOKS_PER_ROW = 10;
@@ -44,23 +45,33 @@ function useNow() {
 /** A book on the shelf. Selecting it opens its details in this same tab (the Back link returns to the bookcase). */
 function Spine({ book, now }) {
   const loc = useLocation();
+  const navigate = useNavigate();
   const h = hash(book.title);
   const [bg, ink] = SPINES[h % SPINES.length];
   const timer = out(book)
     ? `On loan, back in ${fullLeft(book.nextAvailableDate, now)}`
     : `Available now, ${book.availableCopies} of ${book.totalCopies} ${book.totalCopies === 1 ? 'copy' : 'copies'} on the shelf`;
   const tip = `${book.title}, ${book.author} · ${timer}${out(book) && book.nextAvailableDate ? ` (${fmtDate(book.nextAvailableDate)})` : ''}`;
+  const to = `/books/${book.id}`;
+  const state = { from: `${loc.pathname}${loc.search}` };
+  // Select a book: it comes off the shelf and opens, then its details show.
+  const onClick = (e) => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    openBook({ el: e.currentTarget, color: bg, ink, title: book.title, author: book.author, category: book.category, go: () => navigate(to, { state }) });
+  };
   return (
     <Link
-      to={`/books/${book.id}`}
-      state={{ from: `${loc.pathname}${loc.search}` }}
+      to={to}
+      state={state}
+      onClick={onClick}
       className={`sp ${out(book) ? 'out' : ''}`}
       style={{ '--c': bg, '--ink': ink, '--hk': 0.84 + (h % 14) / 100, '--w': `${34 + ((h >> 4) % 14)}px` }}
       data-tip={tip}
       aria-label={`${book.title} by ${book.author}. ${timer}.`}
     >
       <span>{book.title}</span>
-      <em className={`tag ${out(book) ? '' : 'ok'}`}>{out(book) ? shortLeft(book.nextAvailableDate, now) : 'now'}</em>
+      {out(book) && <em className="tag">{shortLeft(book.nextAvailableDate, now)}</em>}
     </Link>
   );
 }
@@ -147,7 +158,7 @@ export default function Shelf() {
           {view && <Link to={view.back} className="back back-btn"><ArrowLeft size={16} /> {view.backLabel}</Link>}
           <h1>{view ? view.title : 'Bookcase'}</h1>
           <p>
-            {view ? <>{view.blurb}{active ? ` Your filter shows ${shown.length} of ${view.books.length} here.` : ''} Hover a book for its title, or select it to see its details. Every book has a timer: gray books are on loan ({loans.length} here) and count down to their return, and “now” means you can borrow it today.</> : ready ? 'We can’t find that bookcase.' : 'Opening the bookcase…'}
+            {view ? <>{view.blurb}{active ? ` Your filter shows ${shown.length} of ${view.books.length} here.` : ''} Hover a book for its title, or select it to see its details. Gray books are on loan ({loans.length} here) and the red ribbon counts down to their return. Books without a ribbon are on the shelf, so you can borrow them today.</> : ready ? 'We can’t find that bookcase.' : 'Opening the bookcase…'}
           </p>
         </div>
         {view && (view.prev || view.next) && (

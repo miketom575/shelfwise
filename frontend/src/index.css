@@ -698,3 +698,17 @@ h1, h2, h3, h4 { font-family: var(--font-read); letter-spacing: -0.01em; }
 .return-note + .return-btn { margin-top: 12px; }
 .slip.is-pending { border-top-color: var(--warn); }
 .badge-pending { display: inline-flex; align-items: center; gap: 4px; border-color: transparent; background: var(--warn-tint); color: var(--warn); }
+
+/* ===== Footer always at the bottom, breadcrumbs ===== */
+#root { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
+.main { flex: 1 0 auto; min-height: 0; }
+.footer { margin-top: auto; }
+.auth-shell { min-height: calc(100dvh - 330px); }
+
+.crumb-trail { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.crumb-trail li + li::before { content: '›'; margin-right: 6px; color: var(--ink-faint); font-size: 1.1rem; }
+.crumb-trail a {
+  display: inline-block; padding: 5px 12px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--ink-soft);
+  font-size: 0.875rem; font-weight: 600; text-decoration: none; transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.crumb-trail a:hover { border-color: var(--primary); background: var(--surface-2); color: var(--ink); }

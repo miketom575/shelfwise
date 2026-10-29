@@ -57,7 +57,10 @@ export default function BookDetail() {
     <>
       <nav className="crumbs" aria-label="Breadcrumb">
         {from && <Link to={from} className="btn-wood"><ArrowLeft size={16} /> Back to the bookcase</Link>}
-        <span><Link to="/catalog">Catalog</Link> / <Link to={`/catalog?category=${encodeURIComponent(book.category)}`}>{book.category}</Link></span>
+        <ol className="crumb-trail">
+          <li><Link to="/catalog">Catalog</Link></li>
+          <li><Link to={`/catalog?category=${encodeURIComponent(book.category)}`}>{book.category}</Link></li>
+        </ol>
       </nav>
       <div className="detail">
         <div className={none ? 'is-out' : ''}><BookCover book={book} /></div>

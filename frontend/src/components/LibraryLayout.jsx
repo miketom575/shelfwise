@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Outlet, useMatch, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowDown, ArrowUp, Filter, Search, X } from 'lucide-react';
+import { Link, Outlet, useMatch, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowDown, ArrowUp, Check, ChevronDown, DoorOpen, Filter, Search, X } from 'lucide-react';
 import { useLibrary } from '../hooks/useLibrary';
 import { ElevatorPanel } from './ElevatorPanel';
 import { NO_FILTER, buildFloors, buildShelves, categoriesOf, clampFloor, filterActive, floorOfKey, floorPath, parseKey, passes } from '../utils/library';
@@ -43,11 +43,59 @@ function FloorDock({ floor, floors, counts, onTravel }) {
   );
 }
 
-/** Narrow the library: only books that are available (or on loan), and/or from one category. */
+/** A dropdown in the site's colours (the browser's own list can't be styled to match). */
+function Dropdown({ label, value, onChange, options }) {
+  const [open, setOpen] = useState(false);
+  const [hot, setHot] = useState(0);
+  const box = useRef(null);
+  const list = useRef(null);
+  const current = options.find((o) => o.value === value) || options[0];
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => { if (box.current && !box.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+
+  useEffect(() => { if (open) list.current?.children[hot]?.scrollIntoView({ block: 'nearest' }); }, [open, hot]);
+
+  const show = () => { setHot(Math.max(0, options.findIndex((o) => o.value === value))); setOpen(true); };
+  const pick = (o) => { onChange(o.value); setOpen(false); };
+  const onKey = (e) => {
+    if (e.key === 'Escape' && open) { e.stopPropagation(); setOpen(false); return; }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!open) { show(); return; }
+      setHot((h) => (e.key === 'ArrowDown' ? Math.min(options.length - 1, h + 1) : Math.max(0, h - 1)));
+    } else if ((e.key === 'Enter' || e.key === ' ') && open) { e.preventDefault(); pick(options[hot]); }
+  };
+
+  return (
+    <div className="dd" ref={box}>
+      <button type="button" className="dd-btn" aria-haspopup="listbox" aria-expanded={open} aria-label={label} onClick={() => (open ? setOpen(false) : show())} onKeyDown={onKey}>
+        <span>{current.label}</span><ChevronDown size={16} aria-hidden="true" />
+      </button>
+      {open && (
+        <ul className="dd-list" role="listbox" aria-label={label} ref={list}>
+          {options.map((o, i) => (
+            <li key={o.value} role="option" aria-selected={o.value === value} className={`${i === hot ? 'hot' : ''} ${o.value === value ? 'sel' : ''}`} onMouseEnter={() => setHot(i)} onMouseDown={(e) => { e.preventDefault(); pick(o); }}>
+              <span>{o.label}</span>{o.value === value && <Check size={15} aria-hidden="true" />}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+const AVAIL = [{ value: 'any', label: 'All books' }, { value: 'in', label: 'Available now' }, { value: 'out', label: 'On loan' }];
+
 function FilterBar({ filter, setFilter, categories }) {
   const [open, setOpen] = useState(false);
   const box = useRef(null);
   const on = filterActive(filter);
+  const cats = [{ value: '', label: 'All categories' }, ...categories.map((c) => ({ value: c, label: c }))];
 
   useEffect(() => {
     if (!open) return undefined;
@@ -65,27 +113,49 @@ function FilterBar({ filter, setFilter, categories }) {
       </button>
       {open && (
         <div className="filter-pop" role="group" aria-label="Filter books">
-          <label>
-            Availability
-            <select className="select" value={filter.avail} onChange={(e) => setFilter({ ...filter, avail: e.target.value })}>
-              <option value="any">All books</option>
-              <option value="in">Available now</option>
-              <option value="out">On loan</option>
-            </select>
-          </label>
-          <label>
-            Category
-            <select className="select" value={filter.category} onChange={(e) => setFilter({ ...filter, category: e.target.value })}>
-              <option value="">All categories</option>
-              {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </label>
+          <div className="fp-field">
+            <span className="fp-label">Availability</span>
+            <Dropdown label="Availability" value={filter.avail} onChange={(v) => setFilter({ ...filter, avail: v })} options={AVAIL} />
+          </div>
+          <div className="fp-field">
+            <span className="fp-label">Category</span>
+            <Dropdown label="Category" value={filter.category} onChange={(v) => setFilter({ ...filter, category: v })} options={cats} />
+          </div>
           <div className="filter-actions">
             {on && <button className="btn btn-sm" type="button" onClick={() => setFilter(NO_FILTER)}><X size={14} /> Clear</button>}
             <button className="btn btn-primary btn-sm" type="button" onClick={() => setOpen(false)}>Done</button>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** "?" at the bottom left of a bookcase page: what the tags and ribbons on the books mean. */
+function ShelfHelp() {
+  const [open, setOpen] = useState(false);
+  const box = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => e.key === 'Escape' && setOpen(false);
+    const onDown = (e) => { if (box.current && !box.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onDown);
+    return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', onDown); };
+  }, [open]);
+
+  return (
+    <div className="help-wrap" ref={box}>
+      {open && (
+        <ul className="help-pop" id="shelf-help" aria-label="How to read the bookcase">
+          <li><span className="hl-plain" /><span>No ribbon. It is on the shelf and you can borrow it today.</span></li>
+          <li><span className="hl-book"><i>4d</i></span><span>On loan. The red ribbon counts the days until it is back. “due” means today or overdue.</span></li>
+          <li className="tip">Hover a book for its title. Select one to take it off the shelf and open it.</li>
+        </ul>
+      )}
+      <button type="button" className="key-btn" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls="shelf-help" aria-label={open ? 'Hide the help' : 'How to read the bookcase'} title="Help">
+        {open ? '×' : '?'}
+      </button>
     </div>
   );
 }
@@ -186,13 +256,17 @@ export function LibraryLayout() {
   return (
     <div className={`lib ${match || onFind ? 'at-shelf' : 'at-floor'}`}>
       <div className="lib-tools">
-        <FilterBar filter={filter} setFilter={setFilter} categories={categories} />
-        <Finder />
+        <Link to="/" className="hud-exit"><DoorOpen size={17} /> Leave library</Link>
+        <div className="tools-right">
+          <FilterBar filter={filter} setFilter={setFilter} categories={categories} />
+          <Finder />
+        </div>
       </div>
       <div className="lib-stage" ref={stage}>
         <Outlet context={ctx} />
       </div>
       {match && <FloorDock floor={floor} floors={floors} counts={counts} onTravel={travel} />}
+      {(match || onFind) && <ShelfHelp />}
       <div className={`doors ${shut ? 'shut' : ''}`} aria-hidden="true"><i /><i /></div>
     </div>
   );
