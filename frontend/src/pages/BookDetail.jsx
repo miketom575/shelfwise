@@ -4,6 +4,7 @@ import { ArrowLeft, Info, Loader2, LogIn, ShieldCheck } from 'lucide-react';
 import { api } from '../api/client';
 import { useAsync } from '../hooks/useAsync';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
 import { BookCover } from '../components/BookCover';
 import { ErrorState } from '../components/Ui';
 import { fmtDate } from '../utils/format';
@@ -23,6 +24,7 @@ export default function BookDetail() {
   const { id } = useParams();
   const from = useLocation().state?.from; // set when the book was opened from a bookcase
   const toast = useToast();
+  const { isAdmin } = useAuth();
   const { data, error, loading, retry } = useAsync((signal) => api.get(`/books/${id}`, { signal }), [id]);
   const [busy, setBusy] = useState(false);
   const [borrowed, setBorrowed] = useState(null);
@@ -57,6 +59,7 @@ export default function BookDetail() {
     <>
       <nav className="crumbs" aria-label="Breadcrumb">
         {from && <Link to={from} className="btn-wood"><ArrowLeft size={16} /> Back to the bookcase</Link>}
+        {!from && <Link to={isAdmin ? '/admin' : '/'} className="btn-wood"><ArrowLeft size={16} /> Back to the dashboard</Link>}
         <ol className="crumb-trail">
           <li><Link to="/catalog">Catalog</Link></li>
           <li><Link to={`/catalog?category=${encodeURIComponent(book.category)}`}>{book.category}</Link></li>
