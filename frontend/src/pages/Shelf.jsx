@@ -118,7 +118,9 @@ function useView() {
   return useMemo(() => {
     if (find) {
       const r = findShelf(books, sp);
-      return { search: true, title: `“${r.name}”`, plate: r.name, n: r.n, of: r.of, books: r.books, total: r.total, prev: r.prev, next: r.next, prevLabel: `Shelf ${r.n - 1}`, nextLabel: `Shelf ${r.n + 1}`, back: '/catalog', backLabel: 'Back to the floors',
+      const word = sp.get('q') ? `“${r.name}”` : r.name; 
+      const nm = word.length > 18 ? `${word.slice(0, 17)}…` : word;
+      return { search: true, title: `“${r.name}”`, plate: r.name, n: r.n, of: r.of, books: r.books, total: r.total, prev: r.prev, next: r.next, prevLabel: `${nm} ${r.n - 1}`, nextLabel: `${nm} ${r.n + 1}`, back: '/catalog', backLabel: 'Back to the floors',
         blurb: `${plural(r.total, 'book')} match “${r.name}”${r.of > 1 ? `, spread over ${r.of} bookcases of up to ${SHELF_CAP}` : ''}.` };
     }
     const k = parseKey(key);

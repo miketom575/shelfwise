@@ -7,6 +7,11 @@ import { useAuth } from '../context/AuthContext';
 import { Spine } from '../components/BookCover';
 import { coverColor, plural } from '../utils/format';
 
+/** Starting from the dashboard means a fresh look: forget any filter left over in the catalog. */
+const resetCatalogFilter = () => {
+  try { sessionStorage.removeItem('lms-filter'); } catch { /* storage can be unavailable */ }
+};
+
 export default function Landing() {
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
@@ -18,6 +23,7 @@ export default function Landing() {
 
   const submit = (e) => {
     e.preventDefault();
+    resetCatalogFilter();
     navigate(`/catalog${qs({ q: q.trim() })}`);
   };
 
@@ -73,7 +79,7 @@ export default function Landing() {
         </div>
         <div className="cat-grid">
           {(cats.data?.data || []).map((c) => (
-            <Link key={c.name} to={`/catalog${qs({ category: c.name })}`} className="cat-tile" style={{ '--c': coverColor(c.name) }}>
+            <Link key={c.name} to={`/catalog${qs({ category: c.name })}`} className="cat-tile" onClick={resetCatalogFilter} style={{ '--c': coverColor(c.name) }}>
               <span>{c.name}</span>
               <small>{plural(c.count, 'title')}</small>
             </Link>
